@@ -1,31 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>AGOL Video Player with Time Seek</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGOL Secure Video Player</title>
+    <script src="https://js.arcgis.com/4.29/"></script>  <!-- ArcGIS API -->
 </head>
 <body>
-    <video id="agolVideo" controls>
-        <source src="https://services1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services/OLFP%20Assessment/FeatureServer/0/9969/attachments/5429?token=3NKHt6i2urmWtqOuugvr9WcyfIyRcplBu0FGa97YoQ0jQHq2WTF2AngjKQIvqK3vHSNgc9rwbul-EipTlxTGBwmAccDl6u1pHRWQsjvlpRflxydcxWToyJJJbbbGw93-QPxTO4eewyPhyi6DFhitmMevXqXZvPjSH41lMP4an8a1UMudVM_e9U2Ag0tl_e7hLPT6mk0EsJsjndM_g458M3mEDnvQGpZawz6-5lHBi4ZWr1COJG_jNm81REoXetdXO9NEOlnG6vBLcpJ8pCbnzjzWW781C-030kFyim-gC_48i805tn80CSXI3eWXZREBvtUE4RcAS86fkwc3eCob_uBig7V0p2bI36eZYcH_m_Y." type="video/mp4">
+    <h2>AGOL Video Player with Secure Authentication</h2>
+    
+    <video id="agolVideo" width="640" height="360" controls>
         Your browser does not support the video tag.
     </video>
 
     <script>
-        // Function to get timestamp from URL (e.g., ?t=60)
-        function getQueryParam(param) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(param);
-        }
+        require([
+            "esri/identity/IdentityManager",
+            "esri/request"
+        ], function (IdentityManager, esriRequest) {
+            
+            // Define AGOL Attachment URL (WITHOUT Token)
+            const baseURL = "https://services1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services/OLFP%20Assessment/FeatureServer/0/9969/attachments/5429";
 
-        // Get start time from URL
-        const startTime = getQueryParam("t");
-
-        // Wait for video to load before seeking
-        const video = document.getElementById("agolVideo");
-        video.addEventListener("loadedmetadata", () => {
-            if (startTime) {
-                video.currentTime = parseFloat(startTime); // Seek to the time
+            // Get ?t= (time) parameter from URL
+            function getQueryParam(param) {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get(param);
             }
+
+            // Authenticate User & Fetch Secure Token
+            async function authenticateAndLoadVideo() {
+                try {
+                    // Check if user is already logged in
+                    const credential = await IdentityManager.checkSignInStatus("https://www.arcgis.com/sharing");
+
+                    // If user is not authenticated, force login
+                    if (!credential) {
+                        await IdentityManager.getCredential("https://www.arcgis.com/sharing");
+                    }
+
+                    // Get valid token
+                    const token = IdentityManager.credentials[0].token;
+                    
+                    // Append token to video URL
+                    const videoURL = `${baseURL}?token=${token}`;
+                    console.log("Authenticated Video URL:", videoURL);
+
+                    // Set video source
+                    const videoElement = document.getElementById("agolVideo");
+                    videoElement.src = videoURL;
+
+                    // Seek to requested time
+                    const startTime = getQueryParam("t");
+                    videoElement.addEventListener("loadedmetadata", () => {
+                        if (startTime) {
+                            videoElement.currentTime = parseFloat(startTime);
+                        }
+                    });
+
+                } catch (error) {
+                    console.error("Authentication Error:", error);
+                    alert("Failed to authenticate with ArcGIS Online!");
+                }
+            }
+
+            // Start Authentication & Load Video
+            authenticateAndLoadVideo();
         });
     </script>
 </body>
 </html>
+
